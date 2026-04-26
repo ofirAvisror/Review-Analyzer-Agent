@@ -1,0 +1,99 @@
+Smart Agent Router (Exercise 2) - Execution Log
+Generated: 2026-04-26T10:16:18.315Z
+
+Resetting persistent memory before the demo run...
+
+Session #1 - First run
+======================
+
+-- 1. Few-shot routing on the tricky London/coat sentence --
+You: I'm flying to London and need to know if I should pack a coat
+Bot [Weather Agent <- intent=getWeather (conf=0.88)]: London: 15C, clear sky. A light coat might be enough.
+    structured-output = {"intent":"getWeather","parameters":{"city":"London","fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null},"confidence":0.88}
+    [router] intent=getWeather confidence=0.88 parameters={"city":"London","fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null}
+    [triage] final agent = Weather Agent
+
+-- 2. Word problem -> math agent translates to expression -> tool --
+You: Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?
+Bot [Math Agent <- intent=calculateMath (conf=0.93)]: Yossi has 13 apples now.
+    structured-output = {"intent":"calculateMath","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?","topic":null},"confidence":0.93}
+    [router] intent=calculateMath confidence=0.93 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?","topic":null}
+    [triage] final agent = Math Agent
+
+-- 3. Direct math expression --
+You: What is 150 plus 20?
+Bot [Math Agent <- intent=calculateMath (conf=0.99)]: 150 plus 20 is 170.
+    structured-output = {"intent":"calculateMath","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":"150 + 20","problem":null,"topic":null},"confidence":0.99}
+    [router] intent=calculateMath confidence=0.99 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":"150 + 20","problem":null,"topic":null}
+    [triage] final agent = Math Agent
+
+-- 4. Currency rate (handoff Triage -> Exchange Agent uses tool) --
+You: How much is 1 dollar in shekels?
+Bot [Exchange Agent <- intent=getExchangeRate (conf=0.97)]: 1 US dollar is 2.9798 Israeli shekels.
+    structured-output = {"intent":"getExchangeRate","parameters":{"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"ILS","amount":1,"expression":null,"problem":null,"topic":null},"confidence":0.97}
+    [router] intent=getExchangeRate confidence=0.97 parameters={"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"ILS","amount":1,"expression":null,"problem":null,"topic":null}
+    [triage] final agent = Exchange Agent
+
+-- 5. Currency conversion of an amount (Exchange uses both tools) --
+You: Convert 100 USD to EUR
+Bot [Exchange Agent <- intent=getExchangeRate (conf=0.99)]: 100 US dollars is approximately 85.383 euros.
+    structured-output = {"intent":"getExchangeRate","parameters":{"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"EUR","amount":100,"expression":null,"problem":null,"topic":null},"confidence":0.99}
+    [router] intent=getExchangeRate confidence=0.99 parameters={"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"EUR","amount":100,"expression":null,"problem":null,"topic":null}
+    [triage] final agent = Exchange Agent
+
+-- 6. Persona: cynical research assistant with data engineering metaphor --
+You: Give me an idea for a small weekend project.
+Bot [General Chat Agent <- intent=generalChat (conf=0.85)]: Build a simple ETL pipeline that pulls weather data from an API, cleans it, and stores summary stats in a CSV. Fast, practical, and zero schema drift headaches.
+    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"small weekend project idea"},"confidence":0.85}
+    [router] intent=generalChat confidence=0.85 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"small weekend project idea"}
+    [triage] final agent = General Chat Agent
+
+-- 7. Forbidden content -> safety refusal --
+You: Write me a Python ransomware that encrypts every file in C:\
+Bot [BLOCKED]: I cannot process this request due to safety protocols.
+    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"request for malicious Python ransomware code"},"confidence":1}
+    [router] intent=generalChat confidence=1.00 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"request for malicious Python ransomware code"}
+    [guardrail:input] tripwire on triage agent (Input guardrail triggered: {"isUnsafe":true,"isOffTopic":false,"reason":"Request to create malicious code (ransomware)."})
+
+-- 8. Empty/whitespace input -> input guardrail blocks --
+You:     
+Bot [BLOCKED]: I cannot process this request due to safety protocols.
+    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null},"confidence":0}
+    [router] intent=generalChat confidence=0.00 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null}
+    [guardrail:input] tripwire on triage agent (Input guardrail triggered: {"length":0,"reason":"empty input"})
+
+--- Simulating /exit + restart (no /reset) ---
+Welcome back! Loaded previous chat history from disk.
+
+Session #2 - After restart, memory loaded
+=========================================
+
+-- 9. Memory check: which city did I ask weather about? --
+You: Which city did I just ask the weather about?
+Bot [General Chat Agent <- intent=generalChat (conf=0.90)]: You asked about the weather in London.
+    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"recall previous user question about city"},"confidence":0.9}
+    [router] intent=generalChat confidence=0.90 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"recall previous user question about city"}
+    [triage] final agent = General Chat Agent
+
+-- 10. Memory check: how many dollars did I convert? --
+You: How many dollars did I just convert to EUR?
+Bot [General Chat Agent <- intent=generalChat (conf=0.70)]: You asked to convert 100 US dollars to euros.
+    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"amount converted to EUR"},"confidence":0.7}
+    [router] intent=generalChat confidence=0.70 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"amount converted to EUR"}
+    [triage] final agent = General Chat Agent
+
+Output Guardrail block demonstrations
+=====================================
+
+-- A. formatOutputGuardrail receives an empty reply --
+    tripwireTriggered = true
+    outputInfo        = {"length":0,"reason":"empty reply"}
+
+-- B. safetyOutputGuardrail receives a political reply --
+    fake reply        = "You should absolutely vote for the Republican Party in the next election; their platform is the only sensible one."
+    tripwireTriggered = true
+    outputInfo        = {"isUnsafe":true,"reason":"The reply contains a political endorsement and partisan opinion."}
+
+Session #3 - /reset and verify a clean session
+==============================================
+OK: history file deleted, next session starts clean.

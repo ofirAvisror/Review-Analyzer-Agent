@@ -1,0 +1,26 @@
+{
+  "name": "smart-agent-router-memory",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.22.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts",
+    "demo": "bun run scripts/demo.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.8.5",
+    "@openai/agents-core": "0.8.5",
+    "bidi-js": "^1.0.3",
+    "dotenv": "^16.6.1",
+    "mathjs": "^14.8.1",
+    "openai": "^6.8.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
