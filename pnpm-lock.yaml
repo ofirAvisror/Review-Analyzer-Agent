@@ -30,8 +30,8 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@types/bun':
-        specifier: latest
+      bun-types:
+        specifier: 1.3.11
         version: 1.3.11
       typescript:
         specifier: ^5.9.3
@@ -81,9 +81,6 @@ packages:
     resolution: {integrity: sha512-OFA7XVV1qXE8lzatvQj080KdSArt8utBExFXRfD5B/R7KT0D+AVaKwg6nLoW3Gxb30vRkIUQf+MaW/Wz+gO3Yg==}
     peerDependencies:
       zod: ^4.0.0
-
-  '@types/bun@1.3.11':
-    resolution: {integrity: sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg==}
 
   '@types/node@25.5.0':
     resolution: {integrity: sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw==}
@@ -595,10 +592,6 @@ snapshots:
       - supports-color
       - utf-8-validate
       - ws
-
-  '@types/bun@1.3.11':
-    dependencies:
-      bun-types: 1.3.11
 
   '@types/node@25.5.0':
     dependencies:
