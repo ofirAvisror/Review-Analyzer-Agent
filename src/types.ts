@@ -1,24 +1,24 @@
-export type Role = "system" | "user" | "assistant";
+export type RouterIntent = "analyzeReview" | "notReview";
 
-export interface Message {
-  role: Role;
-  content: string;
+export type OverallSentiment = "Positive" | "Negative" | "Neutral" | "Mixed";
+
+export type AspectSentiment = "Positive" | "Negative" | "Neutral";
+
+export interface ReviewAspect {
+  topic: string;
+  sentiment: AspectSentiment;
+  detail: string;
 }
 
-export type RouterIntent =
-  | "getWeather"
-  | "calculateMath"
-  | "getExchangeRate"
-  | "generalChat";
+export interface ReviewAnalysis {
+  summary: string;
+  overall_sentiment: OverallSentiment;
+  score: number;
+  aspects: ReviewAspect[];
+}
 
 export interface RouterParameters {
-  city?: string | null;
-  fromCurrencyCode?: string | null;
-  toCurrencyCode?: string | null;
-  amount?: number | null;
-  expression?: string | null;
-  problem?: string | null;
-  topic?: string | null;
+  reviewText?: string | null;
 }
 
 export interface RouterDecision {

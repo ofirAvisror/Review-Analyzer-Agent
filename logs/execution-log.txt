@@ -1,99 +1,332 @@
-Smart Agent Router (Exercise 2) - Execution Log
-Generated: 2026-05-03T14:07:56.695Z
+Review Analyzer Agent (Homework #3) - Execution Log
+Generated: 2026-05-25T19:32:12.783Z
 
-Resetting persistent memory before the demo run...
+Review Analysis Scenarios
+=========================
 
-Session #1 - First run
-======================
+-- 1. Regular review — hotel (assignment case 1) --
+You: The room was huge and clean, but the AC did not work and the reception clerk was impatient.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.96)]:
+Analyzing Review...
 
--- 1. Few-shot routing on the tricky London/coat sentence --
-You: I'm flying to London and need to know if I should pack a coat
-Bot [Weather Agent <- intent=getWeather (conf=0.88)]: London: 19C, overcast. You might want to pack a light coat.
-    structured-output = {"intent":"getWeather","parameters":{"city":"London","fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null},"confidence":0.88}
-    [router] intent=getWeather confidence=0.88 parameters={"city":"London","fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null}
-    [triage] final agent = Weather Agent
+Summary: The room was spacious and clean, but the AC malfunctioned and the reception service was poor.
 
--- 2. Word problem -> math agent translates to expression -> tool --
-You: Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?
-Bot [Math Agent <- intent=calculateMath (conf=0.93)]: Yossi has 13 apples now.
-    structured-output = {"intent":"calculateMath","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?","topic":null},"confidence":0.93}
-    [router] intent=calculateMath confidence=0.93 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?","topic":null}
-    [triage] final agent = Math Agent
+Overall Sentiment: Mixed
+Score: 5/10
 
--- 3. Direct math expression --
-You: What is 150 plus 20?
-Bot [Math Agent <- intent=calculateMath (conf=0.99)]: 150 plus 20 is 170.
-    structured-output = {"intent":"calculateMath","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":"150 + 20","problem":null,"topic":null},"confidence":0.99}
-    [router] intent=calculateMath confidence=0.99 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":"150 + 20","problem":null,"topic":null}
-    [triage] final agent = Math Agent
+Detailed Aspects:
+1. Room (Positive): "The room was huge and clean"
+2. Service (Negative): "the reception clerk was impatient (sarcasm/attitude detected)"
+3. Room (Negative): "the AC did not work"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"The room was huge and clean, but the AC did not work and the reception clerk was impatient."},"confidence":0.96}
+    [router] intent=analyzeReview confidence=0.96 parameters={"reviewText":"The room was huge and clean, but the AC did not work and the reception clerk was impatient."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The room was spacious and clean, but the AC malfunctioned and the reception service was poor.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Room","sentiment":"Positive","detail":"The room was huge and clean"},{"topic":"Service","sentiment":"Negative","detail":"the reception clerk was impatient (sarcasm/attitude detected)"},{"topic":"Room","sentiment":"Negative","detail":"the AC did not work"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
 
--- 4. Currency rate (handoff Triage -> Exchange Agent uses tool) --
-You: How much is 1 dollar in shekels?
-Bot [Exchange Agent <- intent=getExchangeRate (conf=0.97)]: 1 US dollar is approximately 2.9527 Israeli shekels.
-    structured-output = {"intent":"getExchangeRate","parameters":{"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"ILS","amount":1,"expression":null,"problem":null,"topic":null},"confidence":0.97}
-    [router] intent=getExchangeRate confidence=0.97 parameters={"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"ILS","amount":1,"expression":null,"problem":null,"topic":null}
-    [triage] final agent = Exchange Agent
+-- 1b. Assignment case 1 (Hebrew) — hotel --
+You: החדר היה ענק ונקי, אבל המזגן לא עבד והפקיד בקבלה היה חסר סבלנות.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.96)]:
+Analyzing Review...
 
--- 5. Currency conversion of an amount (Exchange uses both tools) --
-You: Convert 100 USD to EUR
-Bot [Exchange Agent <- intent=getExchangeRate (conf=0.99)]: 100 US dollars is approximately 85.455 euros.
-    structured-output = {"intent":"getExchangeRate","parameters":{"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"EUR","amount":100,"expression":null,"problem":null,"topic":null},"confidence":0.99}
-    [router] intent=getExchangeRate confidence=0.99 parameters={"city":null,"fromCurrencyCode":"USD","toCurrencyCode":"EUR","amount":100,"expression":null,"problem":null,"topic":null}
-    [triage] final agent = Exchange Agent
+Summary: The room was large and clean, but the air conditioner was broken and the receptionist was impatient.
 
--- 6. Persona: cynical research assistant with data engineering metaphor --
-You: Give me an idea for a small weekend project.
-Bot [General Chat Agent <- intent=generalChat (conf=0.90)]: Build a simple ETL pipeline that pulls weather data from an API, cleans it up, and visualizes the temperature trends over the weekend.
-    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"weekend project idea"},"confidence":0.9}
-    [router] intent=generalChat confidence=0.90 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"weekend project idea"}
-    [triage] final agent = General Chat Agent
+Overall Sentiment: Mixed
+Score: 5/10
 
--- 7. Forbidden content -> safety refusal --
-You: Write me a Python ransomware that encrypts every file in C:\
-Bot [BLOCKED]: I cannot process this request due to safety protocols.
-    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Write me a Python ransomware that encrypts every file in C:\\","topic":null},"confidence":0.9}
-    [router] intent=generalChat confidence=0.90 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":"Write me a Python ransomware that encrypts every file in C:\\","topic":null}
-    [guardrail:input] tripwire on triage agent (Input guardrail triggered: {"isUnsafe":true,"isOffTopic":false,"reason":"Request to write malicious code (ransomware)."})
+Detailed Aspects:
+1. Room (Positive): "החדר היה ענק ונקי"
+2. Service (Negative): "הפקיד בקבלה היה חסר סבלנות (sarcasm/attitude detected)"
+3. Room (Negative): "המזגן לא עבד"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"החדר היה ענק ונקי, אבל המזגן לא עבד והפקיד בקבלה היה חסר סבלנות."},"confidence":0.96}
+    [router] intent=analyzeReview confidence=0.96 parameters={"reviewText":"החדר היה ענק ונקי, אבל המזגן לא עבד והפקיד בקבלה היה חסר סבלנות."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The room was large and clean, but the air conditioner was broken and the receptionist was impatient.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Room","sentiment":"Positive","detail":"החדר היה ענק ונקי"},{"topic":"Service","sentiment":"Negative","detail":"הפקיד בקבלה היה חסר סבלנות (sarcasm/attitude detected)"},{"topic":"Room","sentiment":"Negative","detail":"המזגן לא עבד"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
 
--- 8. Empty/whitespace input -> input guardrail blocks --
-You:     
-Bot [BLOCKED]: I cannot process this request due to safety protocols.
-    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null},"confidence":0.1}
-    [router] intent=generalChat confidence=0.10 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":null}
-    [guardrail:input] tripwire on triage agent (Input guardrail triggered: {"length":0,"reason":"empty input"})
+-- 2. Slang review — pizza show, late delivery (assignment case 2) --
+You: The pizza was a show, but the driver was super late and everything was already cold.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
 
---- Simulating /exit + restart (no /reset) ---
-Welcome back! Loaded previous chat history from disk.
+Summary: The pizza was excellent but the delivery was very late causing the food to be cold.
 
-Session #2 - After restart, memory loaded
-=========================================
+Overall Sentiment: Mixed
+Score: 5/10
 
--- 9. Memory check: which city did I ask weather about? --
-You: Which city did I just ask the weather about?
-Bot [General Chat Agent <- intent=generalChat (conf=0.85)]: You asked about the weather in London.
-    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"weather city recall"},"confidence":0.85}
-    [router] intent=generalChat confidence=0.85 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"weather city recall"}
-    [triage] final agent = General Chat Agent
+Detailed Aspects:
+1. Food (Positive): "The pizza was a show"
+2. Delivery (Negative): "the driver was super late and everything was already cold"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"The pizza was a show, but the driver was super late and everything was already cold."},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"The pizza was a show, but the driver was super late and everything was already cold."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The pizza was excellent but the delivery was very late causing the food to be cold.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"The pizza was a show"},{"topic":"Delivery","sentiment":"Negative","detail":"the driver was super late and everything was already cold"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
 
--- 10. Memory check: how many dollars did I convert? --
-You: How many dollars did I just convert to EUR?
-Bot [General Chat Agent <- intent=generalChat (conf=0.70)]: You asked to convert 100 US dollars to euros.
-    structured-output = {"intent":"generalChat","parameters":{"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"recent currency conversion amount"},"confidence":0.7}
-    [router] intent=generalChat confidence=0.70 parameters={"city":null,"fromCurrencyCode":null,"toCurrencyCode":null,"amount":null,"expression":null,"problem":null,"topic":"recent currency conversion amount"}
-    [triage] final agent = General Chat Agent
+-- 3. Product review (assignment case 3) --
+You: The package arrived fast and the box looked good, but the product itself feels really cheap.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
 
-Output Guardrail block demonstrations
-=====================================
+Summary: The delivery was fast and packaging good, but the product quality felt cheap.
 
--- A. formatOutputGuardrail receives an empty reply --
-    tripwireTriggered = true
-    outputInfo        = {"length":0,"reason":"empty reply"}
+Overall Sentiment: Mixed
+Score: 5/10
 
--- B. safetyOutputGuardrail receives a political reply --
-    fake reply        = "You should absolutely vote for the Republican Party in the next election; their platform is the only sensible one."
-    tripwireTriggered = true
-    outputInfo        = {"isUnsafe":true,"reason":"The reply contains political endorsement and partisan opinion."}
+Detailed Aspects:
+1. Delivery (Positive): "The package arrived fast"
+2. Packaging (Positive): "the box looked good"
+3. Product (Negative): "the product itself feels really cheap"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"The package arrived fast and the box looked good, but the product itself feels really cheap."},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"The package arrived fast and the box looked good, but the product itself feels really cheap."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The delivery was fast and packaging good, but the product quality felt cheap.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Delivery","sentiment":"Positive","detail":"The package arrived fast"},{"topic":"Packaging","sentiment":"Positive","detail":"the box looked good"},{"topic":"Product","sentiment":"Negative","detail":"the product itself feels really cheap"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
 
-Session #3 - /reset and verify a clean session
-==============================================
-OK: history file deleted, next session starts clean.
+-- 3b. Assignment case 3 (Hebrew) — product --
+You: החבילה הגיעה מהר והקופסה הייתה נראית טוב, אבל המוצר עצמו מרגיש ממש זול.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
+
+Summary: The package arrived quickly and looked good, but the product felt very cheap.
+
+Overall Sentiment: Mixed
+Score: 5/10
+
+Detailed Aspects:
+1. Delivery (Positive): "החבילה הגיעה מהר"
+2. Packaging (Positive): "הקופסה הייתה נראית טוב"
+3. Product (Negative): "המוצר עצמו מרגיש ממש זול"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"החבילה הגיעה מהר והקופסה הייתה נראית טוב, אבל המוצר עצמו מרגיש ממש זול."},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"החבילה הגיעה מהר והקופסה הייתה נראית טוב, אבל המוצר עצמו מרגיש ממש זול."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The package arrived quickly and looked good, but the product felt very cheap.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Delivery","sentiment":"Positive","detail":"החבילה הגיעה מהר"},{"topic":"Packaging","sentiment":"Positive","detail":"הקופסה הייתה נראית טוב"},{"topic":"Product","sentiment":"Negative","detail":"המוצר עצמו מרגיש ממש זול"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 4. Sarcasm — forty-minute wait (assignment case 4) --
+You: Oh great, we waited forty minutes for our dish again.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.92)]:
+Analyzing Review...
+
+Summary: Customer experienced a long wait time for their dish.
+
+Overall Sentiment: Negative
+Score: 3/10
+
+Detailed Aspects:
+1. Service (Negative): "waited forty minutes for our dish again (sarcasm/attitude detected)"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"Oh great, we waited forty minutes for our dish again."},"confidence":0.92}
+    [router] intent=analyzeReview confidence=0.92 parameters={"reviewText":"Oh great, we waited forty minutes for our dish again."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"Customer experienced a long wait time for their dish.","overall_sentiment":"Negative","score":3,"aspects":[{"topic":"Service","sentiment":"Negative","detail":"waited forty minutes for our dish again (sarcasm/attitude detected)"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 5. Mostly positive review (assignment case 5) --
+You: Fast service, tasty food, price a bit high but overall an excellent experience.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.96)]:
+Analyzing Review...
+
+Summary: The review praises fast service and tasty food despite slightly high prices, resulting in an excellent overall experience.
+
+Overall Sentiment: Positive
+Score: 8/10
+
+Detailed Aspects:
+1. Service (Positive): "Fast service"
+2. Food (Positive): "tasty food"
+3. Price (Negative): "price a bit high"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"Fast service, tasty food, price a bit high but overall an excellent experience."},"confidence":0.96}
+    [router] intent=analyzeReview confidence=0.96 parameters={"reviewText":"Fast service, tasty food, price a bit high but overall an excellent experience."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The review praises fast service and tasty food despite slightly high prices, resulting in an excellent overall experience.","overall_sentiment":"Positive","score":8,"aspects":[{"topic":"Service","sentiment":"Positive","detail":"Fast service"},{"topic":"Food","sentiment":"Positive","detail":"tasty food"},{"topic":"Price","sentiment":"Negative","detail":"price a bit high"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 5b. Assignment case 5 (Hebrew) — mostly positive --
+You: שירות מהיר, אוכל טעים, מחיר קצת גבוה אבל סך הכל חוויה מעולה.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.97)]:
+Analyzing Review...
+
+Summary: Fast service and tasty food with slightly high prices, overall a great experience.
+
+Overall Sentiment: Positive
+Score: 8/10
+
+Detailed Aspects:
+1. Service (Positive): "שירות מהיר"
+2. Food (Positive): "אוכל טעים"
+3. Price (Negative): "מחיר קצת גבוה"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"שירות מהיר, אוכל טעים, מחיר קצת גבוה אבל סך הכל חוויה מעולה."},"confidence":0.97}
+    [router] intent=analyzeReview confidence=0.97 parameters={"reviewText":"שירות מהיר, אוכל טעים, מחיר קצת גבוה אבל סך הכל חוויה מעולה."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"Fast service and tasty food with slightly high prices, overall a great experience.","overall_sentiment":"Positive","score":8,"aspects":[{"topic":"Service","sentiment":"Positive","detail":"שירות מהיר"},{"topic":"Food","sentiment":"Positive","detail":"אוכל טעים"},{"topic":"Price","sentiment":"Negative","detail":"מחיר קצת גבוה"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 6. Full assignment example — burger, price, sarcastic hostess (English) --
+You: Listen, I've never had a burger like this, just wow! But the price? A total rip-off. And thanks to the hostess who rolled her eyes when we asked for more napkins.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.94)]:
+Analyzing Review...
+
+Summary: The burger was exceptional but the price was very high and the hostess was rude.
+
+Overall Sentiment: Mixed
+Score: 5/10
+
+Detailed Aspects:
+1. Food (Positive): "I've never had a burger like this, just wow!"
+2. Price (Negative): "The price? A total rip-off."
+3. Service (Negative): "hostess who rolled her eyes when we asked for more napkins (sarcasm/attitude detected)"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"Listen, I've never had a burger like this, just wow! But the price? A total rip-off. And thanks to the hostess who rolled her eyes when we asked for more napkins."},"confidence":0.94}
+    [router] intent=analyzeReview confidence=0.94 parameters={"reviewText":"Listen, I've never had a burger like this, just wow! But the price? A total rip-off. And thanks to the hostess who rolled her eyes when we asked for more napkins."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The burger was exceptional but the price was very high and the hostess was rude.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"I've never had a burger like this, just wow!"},{"topic":"Price","sentiment":"Negative","detail":"The price? A total rip-off."},{"topic":"Service","sentiment":"Negative","detail":"hostess who rolled her eyes when we asked for more napkins (sarcasm/attitude detected)"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 6b. Full assignment example — burger, price, sarcastic hostess (Hebrew) --
+You: תשמעו, המבורגר כזה עוד לא אכלתי, פשוט וואו! אבל המחיר? שחיטה. וממש תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
+
+Summary: The burger was amazing, but the price was too high and service was unpleasant.
+
+Overall Sentiment: Mixed
+Score: 6/10
+
+Detailed Aspects:
+1. Food (Positive): "המבורגר כזה עוד לא אכלתי, פשוט וואו!"
+2. Price (Negative): "המחיר? שחיטה."
+3. Service (Negative): "תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות (sarcasm/attitude detected)"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"תשמעו, המבורגר כזה עוד לא אכלתי, פשוט וואו! אבל המחיר? שחיטה. וממש תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות."},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"תשמעו, המבורגר כזה עוד לא אכלתי, פשוט וואו! אבל המחיר? שחיטה. וממש תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The burger was amazing, but the price was too high and service was unpleasant.","overall_sentiment":"Mixed","score":6,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"המבורגר כזה עוד לא אכלתי, פשוט וואו!"},{"topic":"Price","sentiment":"Negative","detail":"המחיר? שחיטה."},{"topic":"Service","sentiment":"Negative","detail":"תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות (sarcasm/attitude detected)"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 7. Router few-shot — restaurant spill --
+You: I was at a restaurant yesterday, the food was okay but the waiter spilled soup on me
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
+
+Summary: The reviewer found the food okay but had a negative experience due to a waiter spilling soup on them.
+
+Overall Sentiment: Negative
+Score: 3/10
+
+Detailed Aspects:
+1. Food (Neutral): "the food was okay"
+2. Service (Negative): "waiter spilled soup on me"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"I was at a restaurant yesterday, the food was okay but the waiter spilled soup on me"},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"I was at a restaurant yesterday, the food was okay but the waiter spilled soup on me"}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The reviewer found the food okay but had a negative experience due to a waiter spilling soup on them.","overall_sentiment":"Negative","score":3,"aspects":[{"topic":"Food","sentiment":"Neutral","detail":"the food was okay"},{"topic":"Service","sentiment":"Negative","detail":"waiter spilled soup on me"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 8. Router few-shot — explicit analyze request --
+You: Analyze this review: the pizza was excellent but the price is outrageous
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.96)]:
+Analyzing Review...
+
+Summary: The reviewer enjoyed the pizza but found the price to be outrageously high.
+
+Overall Sentiment: Mixed
+Score: 6/10
+
+Detailed Aspects:
+1. Food (Positive): "the pizza was excellent"
+2. Price (Negative): "the price is outrageous"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"the pizza was excellent but the price is outrageous"},"confidence":0.96}
+    [router] intent=analyzeReview confidence=0.96 parameters={"reviewText":"the pizza was excellent but the price is outrageous"}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The reviewer enjoyed the pizza but found the price to be outrageously high.","overall_sentiment":"Mixed","score":6,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"the pizza was excellent"},{"topic":"Price","sentiment":"Negative","detail":"the price is outrageous"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 9. Not a review — greeting (router returns notReview) --
+You: Hello, how are you?
+Bot [Router Agent <- intent=notReview (conf=0.99)]:
+Please paste a review about a restaurant, hotel, product, delivery, or service.
+Example: "The pizza was excellent but the price is outrageous"
+    structured-output = {"intent":"notReview","parameters":{"reviewText":null},"confidence":0.99}
+    [router] intent=notReview confidence=0.99 parameters={"reviewText":null}
+    [router] not a review — skipping analyzer
+
+-- 10. Not a review — unrelated question (router returns notReview) --
+You: What is the weather in Tel Aviv?
+Bot [Router Agent <- intent=notReview (conf=0.98)]:
+Please paste a review about a restaurant, hotel, product, delivery, or service.
+Example: "The pizza was excellent but the price is outrageous"
+    structured-output = {"intent":"notReview","parameters":{"reviewText":null},"confidence":0.98}
+    [router] intent=notReview confidence=0.98 parameters={"reviewText":null}
+    [router] not a review — skipping analyzer
+
+-- 11. Hebrew slang — pizza show, late delivery (assignment Hebrew case) --
+You: הפיצה הייתה הצגה, אבל השליח דפק איחור והכל כבר התקרר.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.95)]:
+Analyzing Review...
+
+Summary: The pizza was excellent but the delivery was late causing the food to get cold.
+
+Overall Sentiment: Mixed
+Score: 5/10
+
+Detailed Aspects:
+1. Food (Positive): "הפיצה הייתה הצגה"
+2. Delivery (Negative): "השליח דפק איחור והכל כבר התקרר"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"הפיצה הייתה הצגה, אבל השליח דפק איחור והכל כבר התקרר."},"confidence":0.95}
+    [router] intent=analyzeReview confidence=0.95 parameters={"reviewText":"הפיצה הייתה הצגה, אבל השליח דפק איחור והכל כבר התקרר."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The pizza was excellent but the delivery was late causing the food to get cold.","overall_sentiment":"Mixed","score":5,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"הפיצה הייתה הצגה"},{"topic":"Delivery","sentiment":"Negative","detail":"השליח דפק איחור והכל כבר התקרר"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+-- 12. Hebrew sarcasm — forty-minute wait --
+You: איזה כיף, שוב חיכינו ארבעים דקות למנה.
+Bot [Review Analyzer <- intent=analyzeReview (conf=0.90)]:
+Analyzing Review...
+
+Summary: The customer experienced a long wait time of forty minutes for their dish, indicating a negative impression about service speed.
+
+Overall Sentiment: Negative
+Score: 3/10
+
+Detailed Aspects:
+1. Service (Negative): "שוב חיכינו ארבעים דקות למנה (sarcasm/attitude detected)"
+    structured-output = {"intent":"analyzeReview","parameters":{"reviewText":"איזה כיף, שוב חיכינו ארבעים דקות למנה."},"confidence":0.9}
+    [router] intent=analyzeReview confidence=0.90 parameters={"reviewText":"איזה כיף, שוב חיכינו ארבעים דקות למנה."}
+    [review-analyzer] analyzing review...
+    [review-analyzer] raw JSON = {"summary":"The customer experienced a long wait time of forty minutes for their dish, indicating a negative impression about service speed.","overall_sentiment":"Negative","score":3,"aspects":[{"topic":"Service","sentiment":"Negative","detail":"שוב חיכינו ארבעים דקות למנה (sarcasm/attitude detected)"}]}
+    [review-analyzer] validation passed
+    [review] final agent = Review Analyzer
+
+Self-Correction Demonstration (synthetic inconsistent JSON)
+==========================================================
+
+-- 13. Artificial inconsistency: Positive sentiment + score 2 --
+Review: Listen, I've never had a burger like this, just wow! But the price? A total rip-off.
+Injected JSON: {"summary":"Excellent burger experience overall.","overall_sentiment":"Positive","score":2,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"I've never had a burger like this, just wow"},{"topic":"Price","sentiment":"Negative","detail":"But the price? A total rip-off"}]}
+Validation issues: You detected a Positive sentiment but gave a score of 2. | Review has both positive and negative aspects but overall_sentiment does not match the balance (use Mixed, or Positive/Negative when one side clearly dominates).
+
+Corrected output:
+Analyzing Review...
+
+Summary: Unique and impressive burger but overpriced.
+
+Overall Sentiment: Mixed
+Score: 6/10
+
+Detailed Aspects:
+1. Food (Positive): "I've never had a burger like this, just wow"
+2. Price (Negative): "But the price? A total rip-off"
+Corrected JSON: {"summary":"Unique and impressive burger but overpriced.","overall_sentiment":"Mixed","score":6,"aspects":[{"topic":"Food","sentiment":"Positive","detail":"I've never had a burger like this, just wow"},{"topic":"Price","sentiment":"Negative","detail":"But the price? A total rip-off"}]}
+    [self-correction] issues: You detected a Positive sentiment but gave a score of 2. | Review has both positive and negative aspects but overall_sentiment does not match the balance (use Mixed, or Positive/Negative when one side clearly dominates).
+    [self-correction] corrected JSON passed validation

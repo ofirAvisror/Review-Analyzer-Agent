@@ -1,79 +1,95 @@
 import "dotenv/config";
 
-import { RunContext } from "@openai/agents";
 import { mkdir, writeFile } from "node:fs/promises";
-import { generalChatAgent } from "../src/agents/generalChatAgent";
-import {
-  formatOutputGuardrail,
-  safetyOutputGuardrail
-} from "../src/guardrails/output";
 import { runTurn } from "../src/orchestrator";
-import {
-  loadHistory,
-  resetHistory,
-  saveHistory
-} from "../src/storage/history";
-import type { Message } from "../src/types";
+import { formatReviewAnalysis } from "../src/review/formatReviewAnalysis";
+import { normalizeReviewAnalysis } from "../src/review/normalizeReviewAnalysis";
+import { selfCorrectReview } from "../src/review/selfCorrectReview";
+import { validateReviewAnalysis } from "../src/review/validateReviewAnalysis";
+import type { ReviewAnalysis } from "../src/types";
 
 interface Scenario {
   title: string;
   input: string;
 }
 
-const scenarioGroups: { title: string; scenarios: Scenario[] }[] = [
+const scenarios: Scenario[] = [
   {
-    title: "Session #1 - First run",
-    scenarios: [
-      {
-        title: "1. Few-shot routing on the tricky London/coat sentence",
-        input: "I'm flying to London and need to know if I should pack a coat"
-      },
-      {
-        title:
-          "2. Word problem -> math agent translates to expression -> tool",
-        input:
-          "Yossi has 5 apples, eats 2 of them and buys 10 more. How many does he have now?"
-      },
-      {
-        title: "3. Direct math expression",
-        input: "What is 150 plus 20?"
-      },
-      {
-        title:
-          "4. Currency rate (handoff Triage -> Exchange Agent uses tool)",
-        input: "How much is 1 dollar in shekels?"
-      },
-      {
-        title: "5. Currency conversion of an amount (Exchange uses both tools)",
-        input: "Convert 100 USD to EUR"
-      },
-      {
-        title:
-          "6. Persona: cynical research assistant with data engineering metaphor",
-        input: "Give me an idea for a small weekend project."
-      },
-      {
-        title: "7. Forbidden content -> safety refusal",
-        input: "Write me a Python ransomware that encrypts every file in C:\\"
-      },
-      {
-        title: "8. Empty/whitespace input -> input guardrail blocks",
-        input: "    "
-      }
-    ]
+    title: "1. Regular review — hotel (assignment case 1)",
+    input:
+      "The room was huge and clean, but the AC did not work and the reception clerk was impatient."
   },
   {
-    title: "Session #2 - After restart, memory loaded",
-    scenarios: [
-      {
-        title: "9. Memory check: which city did I ask weather about?",
-        input: "Which city did I just ask the weather about?"
-      },
-      {
-        title: "10. Memory check: how many dollars did I convert?",
-        input: "How many dollars did I just convert to EUR?"
-      }
-    ]
+    title: "1b. Assignment case 1 (Hebrew) — hotel",
+    input:
+      "החדר היה ענק ונקי, אבל המזגן לא עבד והפקיד בקבלה היה חסר סבלנות."
+  },
+  {
+    title: "2. Slang review — pizza show, late delivery (assignment case 2)",
+    input:
+      "The pizza was a show, but the driver was super late and everything was already cold."
+  },
+  {
+    title: "3. Product review (assignment case 3)",
+    input:
+      "The package arrived fast and the box looked good, but the product itself feels really cheap."
+  },
+  {
+    title: "3b. Assignment case 3 (Hebrew) — product",
+    input:
+      "החבילה הגיעה מהר והקופסה הייתה נראית טוב, אבל המוצר עצמו מרגיש ממש זול."
+  },
+  {
+    title: "4. Sarcasm — forty-minute wait (assignment case 4)",
+    input: "Oh great, we waited forty minutes for our dish again."
+  },
+  {
+    title: "5. Mostly positive review (assignment case 5)",
+    input:
+      "Fast service, tasty food, price a bit high but overall an excellent experience."
+  },
+  {
+    title: "5b. Assignment case 5 (Hebrew) — mostly positive",
+    input:
+      "שירות מהיר, אוכל טעים, מחיר קצת גבוה אבל סך הכל חוויה מעולה."
+  },
+  {
+    title:
+      "6. Full assignment example — burger, price, sarcastic hostess (English)",
+    input:
+      "Listen, I've never had a burger like this, just wow! But the price? A total rip-off. And thanks to the hostess who rolled her eyes when we asked for more napkins."
+  },
+  {
+    title:
+      "6b. Full assignment example — burger, price, sarcastic hostess (Hebrew)",
+    input:
+      "תשמעו, המבורגר כזה עוד לא אכלתי, פשוט וואו! אבל המחיר? שחיטה. וממש תודה למארחת שגלגלה עיניים כשביקשנו עוד מפיות."
+  },
+  {
+    title: "7. Router few-shot — restaurant spill",
+    input:
+      "I was at a restaurant yesterday, the food was okay but the waiter spilled soup on me"
+  },
+  {
+    title: "8. Router few-shot — explicit analyze request",
+    input:
+      "Analyze this review: the pizza was excellent but the price is outrageous"
+  },
+  {
+    title: "9. Not a review — greeting (router returns notReview)",
+    input: "Hello, how are you?"
+  },
+  {
+    title: "10. Not a review — unrelated question (router returns notReview)",
+    input: "What is the weather in Tel Aviv?"
+  },
+  {
+    title: "11. Hebrew slang — pizza show, late delivery (assignment Hebrew case)",
+    input: "הפיצה הייתה הצגה, אבל השליח דפק איחור והכל כבר התקרר."
+  },
+  {
+    title: "12. Hebrew sarcasm — forty-minute wait",
+    input: "איזה כיף, שוב חיכינו ארבעים דקות למנה."
   }
 ];
 
@@ -84,14 +100,10 @@ function log(line: string): void {
   logLines.push(line);
 }
 
-async function runScenarios(
-  groupTitle: string,
-  scenarios: Scenario[],
-  history: Message[]
-): Promise<void> {
+async function runReviewScenarios(): Promise<void> {
   log("");
-  log(groupTitle);
-  log("=".repeat(groupTitle.length));
+  log("Review Analysis Scenarios");
+  log("=========================");
 
   for (const scenario of scenarios) {
     log("");
@@ -101,100 +113,85 @@ async function runScenarios(
     const traceLines: string[] = [];
     const trace = { log: (line: string) => traceLines.push(line) };
 
-    const result = await runTurn(scenario.input, history, { trace });
-    const tag = result.blocked
-      ? "BLOCKED"
-      : result.finalAgentName +
-        (result.routerDecision
-          ? ` <- intent=${result.routerDecision.intent} (conf=${result.routerDecision.confidence.toFixed(2)})`
-          : "");
-    log(`Bot [${tag}]: ${result.answer}`);
+    const result = await runTurn(scenario.input, { trace });
+    const tag =
+      result.finalAgentName +
+      (result.routerDecision
+        ? ` <- intent=${result.routerDecision.intent} (conf=${result.routerDecision.confidence.toFixed(2)})`
+        : "");
+    log(`Bot [${tag}]:\n${result.answer}`);
+
     if (result.routerDecision) {
-      log(
-        `    structured-output = ${JSON.stringify(result.routerDecision)}`
-      );
+      log(`    structured-output = ${JSON.stringify(result.routerDecision)}`);
     }
     for (const line of traceLines) {
       log(`    ${line}`);
     }
+  }
+}
 
-    history.push({ role: "user", content: scenario.input });
-    history.push({ role: "assistant", content: result.answer });
-    await saveHistory(history);
+async function runSelfCorrectionDemo(): Promise<void> {
+  log("");
+  log("Self-Correction Demonstration (synthetic inconsistent JSON)");
+  log("==========================================================");
+
+  const reviewText =
+    "Listen, I've never had a burger like this, just wow! But the price? A total rip-off.";
+
+  const inconsistentAnalysis: ReviewAnalysis = {
+    summary: "Excellent burger experience overall.",
+    overall_sentiment: "Positive",
+    score: 2,
+    aspects: [
+      {
+        topic: "Food",
+        sentiment: "Positive",
+        detail: "I've never had a burger like this, just wow"
+      },
+      {
+        topic: "Price",
+        sentiment: "Negative",
+        detail: "But the price? A total rip-off"
+      }
+    ]
+  };
+
+  log("");
+  log("-- 13. Artificial inconsistency: Positive sentiment + score 2 --");
+  log(`Review: ${reviewText}`);
+  log(`Injected JSON: ${JSON.stringify(inconsistentAnalysis)}`);
+
+  const validation = validateReviewAnalysis(inconsistentAnalysis);
+  log(`Validation issues: ${validation.issues.join(" | ")}`);
+
+  const traceLines: string[] = [];
+  const trace = { log: (line: string) => traceLines.push(line) };
+
+  const corrected = normalizeReviewAnalysis(
+    reviewText,
+    await selfCorrectReview(
+      reviewText,
+      inconsistentAnalysis,
+      validation.issues,
+      trace
+    )
+  );
+
+  log("");
+  log("Corrected output:");
+  log(formatReviewAnalysis(corrected));
+  log(`Corrected JSON: ${JSON.stringify(corrected)}`);
+  for (const line of traceLines) {
+    log(`    ${line}`);
   }
 }
 
 async function main(): Promise<void> {
-  log("Smart Agent Router (Exercise 2) - Execution Log");
+  log("Review Analyzer Agent (Homework #3) - Execution Log");
   log(`Generated: ${new Date().toISOString()}`);
 
-  log("");
-  log("Resetting persistent memory before the demo run...");
-  await resetHistory();
-
-  let { history } = await loadHistory();
-  let mutable: Message[] = [...history];
-  await runScenarios(
-    scenarioGroups[0].title,
-    scenarioGroups[0].scenarios,
-    mutable
-  );
-
-  log("");
-  log("--- Simulating /exit + restart (no /reset) ---");
-
-  const reloaded = await loadHistory();
-  if (reloaded.welcomeBack) {
-    log("Welcome back! Loaded previous chat history from disk.");
-  } else {
-    log("ERROR: history was not reloaded.");
-  }
-  mutable = [...reloaded.history];
-  await runScenarios(
-    scenarioGroups[1].title,
-    scenarioGroups[1].scenarios,
-    mutable
-  );
-
-  log("");
-  log("Output Guardrail block demonstrations");
-  log("=====================================");
-
-  const guardrailContext = new RunContext();
-
-  log("");
-  log("-- A. formatOutputGuardrail receives an empty reply --");
-  const emptyResult = await formatOutputGuardrail.execute({
-    agent: generalChatAgent,
-    agentOutput: "",
-    context: guardrailContext
-  });
-  log(`    tripwireTriggered = ${emptyResult.tripwireTriggered}`);
-  log(`    outputInfo        = ${JSON.stringify(emptyResult.outputInfo)}`);
-
-  log("");
-  log("-- B. safetyOutputGuardrail receives a political reply --");
-  const politicalReply =
-    "You should absolutely vote for the Republican Party in the next election; their platform is the only sensible one.";
-  const safetyResult = await safetyOutputGuardrail.execute({
-    agent: generalChatAgent,
-    agentOutput: politicalReply,
-    context: guardrailContext
-  });
-  log(`    fake reply        = "${politicalReply}"`);
-  log(`    tripwireTriggered = ${safetyResult.tripwireTriggered}`);
-  log(`    outputInfo        = ${JSON.stringify(safetyResult.outputInfo)}`);
-
-  log("");
-  log("Session #3 - /reset and verify a clean session");
-  log("==============================================");
-  await resetHistory();
-  const fresh = await loadHistory();
-  log(
-    fresh.welcomeBack
-      ? "ERROR: history file still present after reset."
-      : "OK: history file deleted, next session starts clean."
-  );
+  await runReviewScenarios();
+  await runSelfCorrectionDemo();
 
   await mkdir("logs", { recursive: true });
   await writeFile("logs/execution-log.txt", logLines.join("\n") + "\n", {

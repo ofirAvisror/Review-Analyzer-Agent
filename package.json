@@ -1,6 +1,7 @@
 {
-  "name": "smart-agent-router-memory",
+  "name": "review-analyzer-agent",
   "version": "1.0.0",
+  "description": "Homework #3 — Review Summarizer & Insight Extraction (ABSA, slang/sarcasm, self-correction)",
   "private": true,
   "packageManager": "pnpm@10.22.0",
   "type": "module",
@@ -13,9 +14,7 @@
   "dependencies": {
     "@openai/agents": "^0.8.5",
     "@openai/agents-core": "0.8.5",
-    "bidi-js": "^1.0.3",
     "dotenv": "^16.6.1",
-    "mathjs": "^14.8.1",
     "openai": "^6.8.1",
     "zod": "^4.3.6"
   },

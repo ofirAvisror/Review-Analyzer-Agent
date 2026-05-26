@@ -1,119 +1,125 @@
-# Smart Agent Router (Exercise 2)
+# Review Analyzer Agent (Homework #3)
 
-Multi-agent CLI assistant built with **OpenAI Agents SDK + TypeScript +
-Bun**. Continuation of Exercise 1 (Smart Agent Router with Memory),
-re-architected around `@openai/agents` primitives:
+**Review Summarizer & Insight Extraction** — CLI that turns free-text customer reviews into structured insights using a **3-stage pipeline**: Router → Review Analyzer → Self-Correction.
 
-- **Agents**            (Router, Triage, Weather, Math, Exchange,
-                          General Chat, plus 2 internal guardrail agents)
-- **Tools**             (`get_weather`, `calculate_math`, `get_exchange_rate`)
-- **Handoffs**          (Triage -> 4 specialists, Exchange -> Math)
-- **Input Guardrails**  (non-empty + LLM safety classifier)
-- **Output Guardrails** (length/format + LLM safety reviewer)
-- **Structured Output** (Router intent / parameters / confidence via Zod)
-- **Memory**            (load / save / reset, history injected into runs)
+Repository: [github.com/ofirAvisror/Review-Analyzer-Agent](https://github.com/ofirAvisror/Review-Analyzer-Agent)
+
+Built with **OpenAI Agents SDK + TypeScript + Bun**.
 
 ## System Requirements
-- pnpm (latest stable version)
-- Bun (latest stable version)
-- OpenAI API key in `OPENAI_API_KEY`
+- pnpm
+- Bun
+- `OPENAI_API_KEY` in `.env` (see `.env.example`)
 
 ## Quick Start
-1. Install dependencies:
-   ```
-   pnpm install
-   ```
-2. Create a `.env` file from `.env.example`:
-   ```
-   OPENAI_API_KEY=sk-...
-   ```
-3. Start the interactive CLI:
-   ```
-   pnpm dev
-   ```
-4. Run the full demonstration (writes `logs/execution-log.txt`):
-   ```
-   pnpm demo
-   ```
-5. Type-check the project:
-   ```
-   pnpm check
-   ```
+```bash
+pnpm install
+pnpm dev      # interactive CLI
+pnpm demo     # run all scenarios → logs/execution-log.txt
+pnpm check    # TypeScript
+```
 
-## CLI Commands
-- `/reset` - clears chat memory and deletes `history.json`.
-- `/exit`  - saves history and exits.
+Dependencies are listed in `package.json` (equivalent to `requirements.txt` for Node/TypeScript projects).
+
+## Architecture
+
+```
+User review text
+  → Router Agent           (ROUTER_SYSTEM_PROMPT: analyzeReview + reviewText)
+  → Review Analyzer Agent  (REVIEW_ANALYZER_PROMPT → JSON via Zod)
+  → Self-Correction Layer  (validateReviewAnalysis → optional correction LLM)
+  → Formatted console output
+```
+
+See also [docs/architecture.md](docs/architecture.md).
+
+### Part A — Router
+- Intent **`analyzeReview`** (supported intent / “function” per assignment) with parameter **`reviewText`**
+- Few-shot examples from the assignment (restaurant, hotel, explicit analyze request, Hebrew reviews)
+- Strips meta-phrases: `"Analyze this review:"`, `"תנתח לי את הביקורת הבאה:"`, etc.
+- Non-review input → `notReview` + short guidance message
+- `resolveReviewText()` prefers the user's original text when the router drops spaces
+
+### Part B — ABSA + Summarization (JSON mode)
+Structured output (JSON only, validated by Zod):
+```json
+{
+  "summary": "one short English sentence",
+  "overall_sentiment": "Positive | Negative | Neutral | Mixed",
+  "score": 6,
+  "aspects": [{ "topic": "Food", "sentiment": "Positive", "detail": "..." }]
+}
+```
+
+### Part C — Slang & Sarcasm
+`REVIEW_ANALYZER_PROMPT` includes explicit rules for **English** ("a show", "rip-off", "Oh great" + complaint) and **Israeli Hebrew** ("אש", "הצגה", "שחיטה", "דפק איחור", "חבל על הזמן", "איזה כיף" + complaint, "גלגלה עיניים"), plus `(sarcasm/attitude detected)` in aspect detail.
+
+### Part D — Self-Correction
+`validateReviewAnalysis()` detects inconsistencies (e.g. Positive + score 2). A second LLM call with `REVIEW_CORRECTION_PROMPT` returns corrected JSON only.
 
 ## Project Layout
 ```
 src/
   agents/
-    routerAgent.ts        Router (few-shot, structured output)
-    triageAgent.ts        Triage (handoffs to specialists)
-    weatherAgent.ts       Weather specialist
-    mathAgent.ts          Math specialist (word-problem capable)
-    exchangeAgent.ts      Exchange specialist (handoff to Math)
-    generalChatAgent.ts   "Pipeline" persona
-  guardrails/
-    input.ts              non-empty + LLM safety classifier
-    output.ts             format + LLM safety reviewer
-  services/
-    weather.ts            Open-Meteo API client
-    math.ts               mathjs-based deterministic evaluator
-    exchange.ts           Frankfurter API client
-  storage/
-    history.ts            history.json persistence
-  prompts.ts              all agent prompts in one file
-  tools.ts                deterministic SDK tools
-  types.ts                shared types
-  orchestrator.ts         router -> triage glue + guardrail catch
-  index.ts                interactive CLI
+    routerAgent.ts           SUPPORTED_ROUTER_INTENTS = analyzeReview | notReview
+    reviewAnalyzerAgent.ts
+    reviewCorrectionAgent.ts
+  review/
+    analyzeReviewPipeline.ts
+    validateReviewAnalysis.ts
+    selfCorrectReview.ts
+    normalizeReviewAnalysis.ts
+    extractReviewText.ts
+    formatReviewAnalysis.ts
+  prompts.ts                 ROUTER_SYSTEM_PROMPT, REVIEW_ANALYZER_PROMPT, REVIEW_CORRECTION_PROMPT
+  orchestrator.ts
+  index.ts                   main entry (CLI)
 scripts/
-  demo.ts                 reproducible demonstration of all scenarios
-docs/
-  architecture.md         architectural overview (deliverable)
+  demo.ts
 logs/
-  execution-log.txt       generated by `pnpm demo`
+  execution-log.txt
 ```
 
-## How a Turn Flows
+## Demo Log (`pnpm demo`)
+
+| Scenario | Assignment mapping |
+|----------|-------------------|
+| 1, 1b | Case 1 — hotel (EN + HE) |
+| 2, 11 | Case 2 — pizza slang |
+| 3, 3b | Case 3 — product (EN + HE) |
+| 4, 12 | Case 4 — sarcasm (EN + HE) |
+| 5, 5b | Case 5 — mostly positive (EN + HE) |
+| 6, 6b | Full burger + hostess example (EN + HE) |
+| 7–8 | Router few-shots |
+| 9–10 | notReview |
+| 13 | **Required** self-correction demo (synthetic Positive + score 2) |
+
+## Submission Checklist (Homework #3)
+
+| Deliverable | File |
+|-------------|------|
+| Source + prompts + entry point + dependencies | `src/`, `scripts/demo.ts`, `package.json` |
+| Short explanation (architecture, router, ABSA, slang, self-correction) | this README + `docs/architecture.md` |
+| Execution log (≥3 runs: regular, slang, self-correction) | `logs/execution-log.txt` |
+| Valid JSON + clear console output for every `analyzeReview` | `formatReviewAnalysis.ts`, demo log |
+
+## Example Output
 ```
-User input
-  -> Router Agent  (few-shot prompt, structured output: intent /
-                    parameters / confidence)
-  -> Triage Agent  (input guardrails fire here; performs SDK handoff
-                    to the matching specialist)
-       -> Weather Agent      uses get_weather
-       -> Math Agent         uses calculate_math (word problem -> expr)
-       -> Exchange Agent     uses get_exchange_rate (+ calculate_math
-                             for amount conversions; can hand off
-                             further to Math Agent)
-       -> General Chat Agent persona reply (output guardrails fire here)
-  -> Final answer printed
-  -> History persisted to history.json
+Analyzing Review...
+
+Summary: Excellent food, but the experience was hurt by high prices and poor service attitude.
+
+Overall Sentiment: Mixed
+Score: 6/10
+
+Detailed Aspects:
+1. Food (Positive): "המבורגר כזה עוד לא אכלתי, פשוט וואו"
+2. Price (Negative): "המחיר? שחיטה"
+3. Service (Negative): "מארחת שגלגלה עיניים (sarcasm/attitude detected)"
 ```
 
-## Required Demonstrations
-The script `pnpm demo` writes `logs/execution-log.txt`, which contains:
-
-1. Few-shot routing on a tricky sentence
-   ("flying to London, should I pack a coat" -> `getWeather`).
-2. The Router's full structured output
-   (`intent`, `parameters`, `confidence`).
-3. A word problem solved by the Math Agent translating to an expression
-   and delegating to the `calculate_math` tool.
-4. Real handoffs (Triage -> specialist, Exchange uses two tools and
-   could hand off to Math).
-5. Input Guardrail blocking a malicious-code request.
-6. Output Guardrails blocking (a) an empty reply and (b) a political reply.
-7. Persona-driven reply with a Data Engineering metaphor.
-8. Forbidden question -> canonical safety refusal.
-9. Memory: exit + restart and the bot recalls prior context.
-
-## Notes
-- `getWeather`         uses Open-Meteo (geocoding + forecast).
-- `calculateMath`      uses `mathjs` deterministically; the LLM never
-                       computes results itself.
-- `getExchangeRate`    uses the public Frankfurter API.
-- All prompts (Router, Triage, specialists, guardrails) live in
-  `src/prompts.ts` per the assignment requirement of a separate file.
+## Design Notes
+- **JSON mode + Zod**: parseable, testable, enables deterministic validation before display.
+- **Anti-hallucination**: aspects must be supported by the review text; `normalizeReviewAnalysis` aligns quotes to the source review.
+- **Post-processing**: fixes spacing in summaries, realigns aspect quotes, and annotates sarcasm when detected.
+- **HW3-only codebase**: no weather/math/exchange/triage from Homework #2.

@@ -3,21 +3,10 @@ import { z } from "zod";
 
 import { ROUTER_AGENT_PROMPT } from "../prompts";
 
-export const RouterIntentSchema = z.enum([
-  "getWeather",
-  "calculateMath",
-  "getExchangeRate",
-  "generalChat"
-]);
+export const RouterIntentSchema = z.enum(["analyzeReview", "notReview"]);
 
 export const RouterParametersSchema = z.object({
-  city: z.string().nullable(),
-  fromCurrencyCode: z.string().nullable(),
-  toCurrencyCode: z.string().nullable(),
-  amount: z.number().nullable(),
-  expression: z.string().nullable(),
-  problem: z.string().nullable(),
-  topic: z.string().nullable()
+  reviewText: z.string().nullable()
 });
 
 export const RouterDecisionSchema = z.object({
@@ -32,11 +21,13 @@ export const RouterDecisionSchema = z.object({
 
 export type RouterDecisionParsed = z.infer<typeof RouterDecisionSchema>;
 
+/** Assignment Part A — supported intents (analyzeReview + notReview). */
+export const SUPPORTED_ROUTER_INTENTS = RouterIntentSchema.options;
+
 export const routerAgent = new Agent({
   name: "Router Agent",
   handoffDescription:
-    "Classifies the user's intent and produces structured routing data. " +
-    "Does not answer the user.",
+    "Classifies whether user input is a review to analyze and extracts reviewText.",
   instructions: ROUTER_AGENT_PROMPT,
   model: "gpt-4.1-mini",
   outputType: RouterDecisionSchema

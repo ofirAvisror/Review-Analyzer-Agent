@@ -1,22 +1,19 @@
-import {
-  assistant,
-  InputGuardrailTripwireTriggered,
-  OutputGuardrailTripwireTriggered,
-  run,
-  system,
-  user
-} from "@openai/agents";
-import type { AgentInputItem } from "@openai/agents";
+import { run } from "@openai/agents";
 
 import {
   RouterDecisionSchema,
   routerAgent
 } from "./agents/routerAgent";
-import { triageAgent } from "./agents/triageAgent";
-import type { Message, RouterDecision, TurnResult } from "./types";
+import { runReviewPipeline } from "./review/analyzeReviewPipeline";
+import { resolveReviewText } from "./review/extractReviewText";
+import { formatReviewAnalysis } from "./review/formatReviewAnalysis";
+import type { RouterDecision, TurnResult } from "./types";
 
-const SAFETY_REFUSAL =
-  "I cannot process this request due to safety protocols.";
+const NOT_A_REVIEW_MESSAGE =
+  "Please paste a review about a restaurant, hotel, product, delivery, or service.\n" +
+  'Example: "The pizza was excellent but the price is outrageous"';
+
+const EMPTY_INPUT_MESSAGE = "Please enter a review to analyze.";
 
 interface TraceLogger {
   log: (line: string) => void;
@@ -30,71 +27,70 @@ export interface RunTurnOptions {
 
 export async function runTurn(
   userInput: string,
-  history: Message[],
   options: RunTurnOptions = {}
 ): Promise<TurnResult> {
   const trace = options.trace ?? noopTrace;
+  const trimmed = userInput.trim();
+
+  if (trimmed.length === 0) {
+    trace.log("[input] empty input rejected");
+    return {
+      answer: EMPTY_INPUT_MESSAGE,
+      routerDecision: null,
+      finalAgentName: "Input Validator",
+      blocked: false
+    };
+  }
 
   let routerDecision: RouterDecision | null = null;
   try {
-    const routerResult = await run(routerAgent, userInput);
+    const routerResult = await run(routerAgent, trimmed);
     routerDecision = validateRouterOutput(routerResult.finalOutput);
+  } catch (error) {
+    trace.log(
+      `[router] failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+    throw error;
+  }
+
+  if (routerDecision.intent !== "analyzeReview") {
     trace.log(
       `[router] intent=${routerDecision.intent} confidence=${routerDecision.confidence.toFixed(
         2
       )} parameters=${JSON.stringify(routerDecision.parameters)}`
     );
-  } catch (error) {
-    if (error instanceof InputGuardrailTripwireTriggered) {
-      trace.log(
-        `[guardrail:input] tripwire from router agent (${error.message})`
-      );
-      return safeRefusal("Router Agent", routerDecision);
-    }
-    trace.log(
-      `[router] failed: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-
-  const triageInput = buildTriageInput(userInput, history, routerDecision);
-
-  try {
-    const triageResult = await run(triageAgent, triageInput);
-    const finalAgentName = triageResult.lastAgent?.name ?? "Triage Agent";
-    const answer = stringifyFinalOutput(triageResult.finalOutput);
-    trace.log(`[triage] final agent = ${finalAgentName}`);
+    trace.log("[router] not a review — skipping analyzer");
     return {
-      answer,
+      answer: NOT_A_REVIEW_MESSAGE,
       routerDecision,
-      finalAgentName,
+      finalAgentName: "Router Agent",
       blocked: false
     };
-  } catch (error) {
-    if (error instanceof InputGuardrailTripwireTriggered) {
-      trace.log(
-        `[guardrail:input] tripwire on triage agent (${error.message})`
-      );
-      return safeRefusal("Triage Agent", routerDecision);
-    }
-    if (error instanceof OutputGuardrailTripwireTriggered) {
-      trace.log(
-        `[guardrail:output] tripwire on final agent (${error.message})`
-      );
-      return safeRefusal("General Chat Agent", routerDecision);
-    }
-    throw error;
   }
-}
 
-function safeRefusal(
-  agentName: string,
-  routerDecision: RouterDecision | null
-): TurnResult {
+  const reviewText = resolveReviewText(
+    trimmed,
+    routerDecision.parameters.reviewText
+  );
+  routerDecision.parameters.reviewText = reviewText;
+  trace.log(
+    `[router] intent=${routerDecision.intent} confidence=${routerDecision.confidence.toFixed(
+      2
+    )} parameters=${JSON.stringify(routerDecision.parameters)}`
+  );
+
+  const pipelineResult = await runReviewPipeline(reviewText, trace);
+  const answer = formatReviewAnalysis(pipelineResult.analysis);
+  const finalAgentName = pipelineResult.corrected
+    ? "Review Analyzer (self-corrected)"
+    : "Review Analyzer";
+  trace.log(`[review] final agent = ${finalAgentName}`);
+
   return {
-    answer: SAFETY_REFUSAL,
+    answer,
     routerDecision,
-    finalAgentName: agentName,
-    blocked: true
+    finalAgentName,
+    blocked: false
   };
 }
 
@@ -116,57 +112,15 @@ function validateRouterOutput(value: unknown): RouterDecision {
 function sanitizeParameters<T extends Record<string, unknown>>(value: T): T {
   const cleaned: Record<string, unknown> = { ...value };
   for (const [key, raw] of Object.entries(cleaned)) {
-    if (typeof raw === "string") {
-      const stripped = raw
-        .trim()
+    if (typeof raw !== "string") continue;
+    let stripped = raw.trim();
+    if (/^[\[\{]/.test(stripped) && /[\]\}]$/.test(stripped)) {
+      stripped = stripped
         .replace(/[\s,]*[\]\}]+[\s,]*$/g, "")
         .replace(/^[\[\{][\s,]*/g, "")
         .trim();
-      cleaned[key] = stripped.length === 0 ? null : stripped;
     }
+    cleaned[key] = stripped.length === 0 ? null : stripped;
   }
   return cleaned as T;
-}
-
-function buildTriageInput(
-  userInput: string,
-  history: Message[],
-  routerDecision: RouterDecision | null
-): AgentInputItem[] {
-  const items: AgentInputItem[] = [];
-
-  if (routerDecision) {
-    items.push(
-      system(
-        `Routing hint from Router Agent: intent=${routerDecision.intent}, confidence=${routerDecision.confidence.toFixed(
-          2
-        )}, parameters=${JSON.stringify(routerDecision.parameters)}.`
-      )
-    );
-  }
-
-  for (const message of history) {
-    if (message.role === "user") {
-      items.push(user(message.content));
-    } else if (message.role === "assistant") {
-      items.push(assistant(message.content));
-    } else if (message.role === "system") {
-      items.push(system(message.content));
-    }
-  }
-
-  items.push(user(userInput));
-  return items;
-}
-
-function stringifyFinalOutput(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  if (typeof value === "object") {
-    const v = value as { reply?: unknown; text?: unknown };
-    if (typeof v.reply === "string") return v.reply;
-    if (typeof v.text === "string") return v.text;
-    return JSON.stringify(value);
-  }
-  return String(value);
 }
